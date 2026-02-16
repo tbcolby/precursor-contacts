@@ -6,7 +6,6 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-extern crate alloc;
 
 mod app;
 mod contact;
@@ -18,7 +17,7 @@ use num_traits::FromPrimitive;
 use num_traits::ToPrimitive;
 
 const SERVER_NAME: &str = "_Contact Book_";
-const APP_NAME: &str = "Contacts";
+const APP_NAME: &str = "Contact Book";
 
 #[derive(Debug, num_derive::FromPrimitive, num_derive::ToPrimitive)]
 enum AppOp {
@@ -42,8 +41,8 @@ fn main() -> ! {
 
     let token = gam
         .register_ux(gam::UxRegistration {
-            app_name: alloc::string::String::from(APP_NAME),
-            ux_type: gam::UxType::Chat,
+            app_name: String::from(gam::APP_NAME_CONTACTS),
+            ux_type: gam::UxType::Framebuffer,
             predictor: None,
             listener: sid.to_array(),
             redraw_id: AppOp::Redraw.to_u32().unwrap(),
