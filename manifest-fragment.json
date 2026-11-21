@@ -1,0 +1,11 @@
+{
+    "contacts": {
+        "context_name": "Contacts",
+        "menu_name": {
+            "appmenu.contacts": {
+                "en": "Contacts",
+                "en-tts": "Contacts"
+            }
+        }
+    }
+}
