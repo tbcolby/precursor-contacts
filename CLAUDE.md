@@ -1,25 +1,22 @@
-# Contact Book — Agent Instructions
+# Contact Book — Build Notes
 
-## App Identity
-- **Package**: `contacts`
-- **SERVER_NAME**: `_Contact Book_`
-- **APP_NAME**: `Contacts`
-- **manifest context_name**: `Contacts`
-- **TCP Port**: 7882 (reserved, not implemented)
+Package `contacts`, server name `_Contact Book_`, GAM app name
+`gam::APP_NAME_CONTACTS` (manifest key `contacts`, context name `Contacts`).
 
 ## Architecture
-- **UX Type**: `UxType::Chat` with raw keyboard input
-- **State Machine**: 6 states (List, View, Add, Edit, Search, ConfirmDelete)
-- **Threading**: None
-- **PDDB**: 1 dictionary (`contacts.data`), N+2 keys
+- `core/` (`contacts-core`, no Xous deps, host-tested): contact record
+  format, search across all fields, sorting with one shared name comparator,
+  and the screen state machine (`Ui`, which returns `Effect`s for storage and
+  leaving).
+- `src/main.rs` routes GAM messages (template pattern, `UxType::Framebuffer`);
+  `src/app.rs` maps keys to `Ui`, performs effects via `appkit::store::Store`,
+  draws via `appkit::screen::Screen`. No pump.
+- One PDDB key per contact (`contacts.data` / `c.<16 hex>`, random names from
+  the TRNG, fail closed). No index, no id counter. Edits rewrite the key in
+  its own basis; contacts are reloaded on every basis change.
 
-## Key Design Decisions
-1. **Index + individual keys** — contact index stored as JSON array of IDs; each contact is a separate PDDB key. This allows individual contact updates without rewriting the entire collection.
-2. **Case-insensitive search** — manual byte-level lowercasing (no `to_lowercase()` which needs Unicode tables). Simple substring matching.
-3. **Field editing sub-mode** — `editing_field: bool` toggles between navigating fields and typing into them. Same EditField enum for both Add and Edit states.
-4. **Confirmation dialog** — Delete requires explicit Y key press. Any other key cancels.
-
-## Build
+## Test / gate
 ```bash
-cargo build -p contacts --target riscv32imac-unknown-xous-elf
+cd core && cargo test
+cd ../xous-dev-toolkit && bin/integrate --xous-root <xous-core> --grade -v ../precursor-contacts
 ```

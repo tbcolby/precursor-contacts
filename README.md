@@ -1,106 +1,78 @@
-# Precursor Contact Book
+# precursor-contacts: Contact Book
 
-**Your address book in a hardware vault.**
-
-```
-"Your relationships are not someone else's data.
-Who you know, how often you call them,
-when you met — all of this is yours.
-Keep it that way."
-```
-
----
-
-## What This Is
-
-An encrypted contact manager for Precursor. Add, search, edit, and organize contacts — all stored in PDDB hardware-encrypted flash with plausible deniability. No cloud sync. No backup to someone else's server. No social graph for an algorithm to mine.
-
----
-
-## Why Precursor
-
-**PDDB encryption.** Every contact record is encrypted at rest in hardware flash. The plausible deniability feature means contacts can exist in basis sets that are invisible without the correct password. Your address book is private not just from networks, but from anyone holding the device.
-
-**Physical keyboard.** Names, phone numbers, emails — typed directly on hardware keys. No on-screen keyboard, no autocorrect leaking input to a cloud model.
-
-**No network.** Contacts cannot be synced, scraped, or exfiltrated. There is no "sync to cloud" option because there is no cloud.
-
----
+An offline address book for the [Precursor](https://precursor.dev). Contacts live in the device's PDDB (encrypted flash); there is no network code, no sync and no export.
 
 ## Features
 
-- **Contact records**: Name, phone, email, notes, category (Personal/Work/Family/Other)
-- **Incremental search**: Type to filter contacts by name, live match count
-- **Sort modes**: Alphabetical or by category
-- **Category tags**: Visual [PER] [WRK] [FAM] [OTH] tags in list view
-- **Full CRUD**: Add, view, edit, delete with confirmation
-- **Scrollable list**: Browse 200+ contacts with scroll
-- **PDDB persistence**: All data encrypted at rest, survives reboot
-- **Field editing**: Navigate fields with arrows, type with cursor
+- **Contacts** with name (required, up to 40 chars), phone (20), email (60), notes (120) and a category (Personal, Work, Family, Other). Limits count characters, so accented names work.
+- **Search** as you type across name, phone, email and notes, case-insensitive. The filter stays on the list until you clear it.
+- **Sort** alphabetically or by category then name. Both use the same case-insensitive name order.
+- **View** shows every field and which PDDB basis the contact lives in.
+- **Add / edit / delete**, with a confirmation before deleting and before discarding unsaved edits. Saving without a name keeps the form and says "Name is required".
+- **Basis aware.** Locking or unlocking a basis reloads the list, so contacts in a locked basis disappear from memory and screen, and contacts in a newly unlocked basis appear. The new-contact form shows which basis it will be saved to, and the confirmation names the basis it landed in.
 
----
+## Keys
 
-## Keyboard Reference
+| Screen | Key | Action |
+|---|---|---|
+| List | ↑ ↓ | Move |
+| | Enter | View contact |
+| | N or F1 | New contact |
+| | S, / or F2 | Search |
+| | O | Toggle sort (A-Z / category) |
+| | D or F3 | Delete (asks Y to confirm) |
+| | Backspace | Clear the search filter; with no filter, leave the app |
+| | F4 | Leave the app |
+| Search | type | Filter as you type |
+| | Enter | Back to the filtered list |
+| | Backspace | Delete a character; on an empty query, cancel |
+| | F4 | Cancel (clears the filter) |
+| View | E, Enter or F1 | Edit |
+| | D or F3 | Delete (asks Y to confirm) |
+| | Backspace / F4 | Back |
+| Edit | ↑ ↓ | Previous / next field |
+| | type | Into the selected text field |
+| | Enter | Next field; on Category, cycle; on [Save], save |
+| | ← → or Space | Cycle category (on Category) |
+| | Backspace | Delete a character; on an empty field, previous field |
+| | F2 | Save from any field |
+| | F4 | Cancel (asks first if anything changed) |
 
-### Contact List
-| Key | Action |
-|-----|--------|
-| Up/Down | Navigate contacts |
-| Enter | View selected |
-| N | New contact |
-| S | Search by name |
-| O | Toggle sort (alpha / category) |
-| D | Delete selected |
-| Q | Quit app |
+The menu key `∴` opens the system menu; the app never sees it. Leaving hands focus back to the system; the app keeps running and reopens from the menu.
 
-### Editing
-| Key | Action |
-|-----|--------|
-| Up/Down | Navigate fields |
-| Enter | Edit field / Save |
-| C | Cycle category |
-| Tab | Next field |
-| Q | Cancel (don't save) |
+## Storage
 
----
+PDDB dictionary `contacts.data`, one key per contact named `c.<16 random hex>`, holding JSON `{"version":1, "name", "phone", "email", "notes", "category"}`.
 
-## Architecture
+- There is no index and no id counter. Record names are random, so a lost counter can no longer make a new contact overwrite an old one, and a new contact can't collide with one in a locked basis. If the TRNG fails, the contact isn't saved and the app says so.
+- New contacts go to the most recently unlocked basis. Editing a contact rewrites its key in the basis it already lives in (delete and recreate, then sync), so contacts don't migrate between bases.
+- Nothing is written except on save and delete; switching apps writes nothing.
+- A record that can't be parsed, or that a newer version wrote, is counted as "unreadable" on the list and left untouched.
+- Delete removes that contact's PDDB key and syncs. The PDDB doesn't overwrite the old flash pages immediately, so treat deletion as "gone from the app", not secure erasure.
 
-```
-src/
-  main.rs      — Xous event loop, GAM registration
-  app.rs       — State machine (List, View, Add, Edit, Search, ConfirmDelete)
-  contact.rs   — Contact data model, search, sorting
-  ui.rs        — All rendering
-  storage.rs   — PDDB persistence (index + individual records)
-```
+### What the PDDB does and doesn't give you
 
----
+Contacts are encrypted at rest by the PDDB. Anyone who can unlock a basis can read every contact in it. Contacts saved while a secret basis is open go into that basis and are hidden when it is locked; that is the PDDB's own plausible-deniability behaviour, which the app now respects (reload on basis change, no writes into the wrong basis). Within an unlocked basis, the dictionary name and the number of `c.*` keys reveal that you keep contacts and roughly how many.
 
-## Build
+## Limitations
+
+- No vCard import/export and no QR export yet.
+- Contact text is wiped from the app's own buffers on drop where practical (`zeroize`), and `Debug` output never contains it. Copies made by GAM when drawing, and transient buffers inside `serde_json` and the PDDB, are outside the app's control.
+- The 0.1.0 keys (`index`, `config`, `contact.<id>`) are not migrated: that version never compiled, so no device has such data.
+- Renode capture not yet run. `capture.py` is written but not executed; verification so far is the hosted build, clippy, lint and 35 host tests.
+
+## Build and test
 
 ```bash
-cargo build -p contacts --target riscv32imac-unknown-xous-elf
+cd core && cargo test                                   # host tests
+cd xous-dev-toolkit && bin/integrate --xous-root ~/xous-core --grade ../precursor-contacts
+cd ~/xous-core && cargo xtask run contacts               # hosted mode
 ```
 
----
-
-## Development
-
-This app was developed using the methodology described in [xous-dev-toolkit](https://github.com/tbcolby/xous-dev-toolkit) — an LLM-assisted approach to Precursor app development on macOS ARM64.
+Layout: `core/` (`contacts-core`: record format, search, sorting, screen state machine; no Xous deps), `src/main.rs` (message routing), `src/app.rs` (drawing, PDDB, TRNG on `precursor-appkit`).
 
 ---
 
-## Author
+Made by Tyler Colby, [Colby's Data Movers, LLC](https://colbysdatamovers.com). Issues: [GitHub](https://github.com/tbcolby/precursor-contacts/issues).
 
-Made by Tyler Colby — [Colby's Data Movers, LLC](https://colbysdatamovers.com)
-
-Contact: [tyler@colbysdatamovers.com](mailto:tyler@colbysdatamovers.com) | [GitHub Issues](https://github.com/tbcolby/precursor-contacts/issues)
-
----
-
-## License
-
-Licensed under the Apache License, Version 2.0.
-
-See [LICENSE](LICENSE) for the full text.
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
